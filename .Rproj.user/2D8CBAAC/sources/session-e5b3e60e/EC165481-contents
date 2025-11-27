@@ -1,8 +1,13 @@
 library(dplyr)
 library(ggplot2)
 library(reshape2)
+library(dplyr)
+library(moments)
 
+# Carga de datos de la hoja de Excel
 df <- read_excel("data/DATOS ESTADISTICA.xlsx", sheet="FORMATO 1")
+
+# ============= AGREGACIÓN DE DATOS =================
 
 df_agg <- df %>%
   group_by(Juego, `Condicion de la torre`, `Numero de jugadores`) %>%
@@ -23,10 +28,20 @@ df_agg <- df %>%
   ) %>%
   ungroup()
 
-# Seleccionar solo variables numéricas relevantes
+# Eliminar columna Juego que no aporta información
+df_agg <- df_agg %>% select(-Juego)
+
+# Renombrar columnas con espacios a guión bajo
+df_agg <- df_agg %>% 
+  rename(
+    Condicion_de_la_torre = `Condicion de la torre`,
+    Numero_de_jugadores   = `Numero de jugadores`
+  )
+
+# Separación de variables
 df_num <- df_agg %>% 
   select(
-    Numero_de_jugadores = `Numero de jugadores`,
+    Numero_de_jugadores,
     Tiempo_promedio,
     Tiempo_mediana,
     Tiempo_sd,
@@ -38,6 +53,82 @@ df_num <- df_agg %>%
     Dominante_n,
     NoDominante_n
   )
+
+df_categoricas <- df_agg %>% select(where(is.character))
+
+# ================ EXPLORACIÓN DE DATOS ====================
+# Datos númericos
+resumen_numerico <- df_num %>%
+  summarise(
+    across(everything(),
+           list(
+             media = mean,
+             mediana = median,
+             sd = sd,
+             min = min,
+             max = max,
+             iqr = IQR
+           ),
+           na.rm = TRUE)
+  )
+
+forma_numerica <- df_num %>%
+  summarise(
+    across(everything(),
+           list(
+             skewness = skewness,
+             kurtosis = kurtosis
+           ),
+           na.rm = TRUE)
+  )
+
+# Historigramas
+for (v in names(df_num)) {
+    p <- ggplot(df_agg, aes(x = .data[[v]])) +
+      geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+      theme_minimal() +
+      labs(title = paste("Histograma de", v), x = v, y = "Frecuencia")
+  
+    ggsave(
+      filename = paste0("histograma_", v, ".png"),
+      plot = p,
+      width = 6,
+      height = 4,
+      dpi = 300
+    )
+}
+
+
+# Diagramas de caja
+for (v in names(df_num)) {
+    p <- ggplot(df_agg, aes(y = .data[[v]])) +
+      geom_boxplot(fill = "lightgreen") +
+      theme_minimal() +
+      labs(title = paste("Diagrama de caja de", v), y = v)
+
+    ggsave(
+      filename = paste0("boxplot_", v, ".png"),
+      plot = p,
+      width = 6,
+      height = 4,
+      dpi = 300
+    )
+}
+
+
+# VARIABLES CATEGÓRICAS
+
+# Gráficos de barras
+for (v in names(df_categoricas)) {
+  print(
+    ggplot(df_agg, aes(x = .data[[v]])) +
+      geom_bar(fill = "orange", color = "black") +
+      theme_minimal() +
+      labs(title = paste("Frecuencias de", v), x = v, y = "Cuenta")
+  )
+}
+
+# ================ CORRELACIÓN DE DATOS ===================
 
 # Matriz de correlación
 corr_matrix <- cor(df_num, use = "complete.obs")
@@ -83,7 +174,7 @@ ggplot(df_agg, aes(x = Intentos_totales, y = Tiempo_promedio)) +
   labs(title = "Intentos totales vs Tiempo promedio")
 
 # 4. Numero_de_jugadores vs Dominante_prop
-ggplot(df_agg, aes(x = `Numero de jugadores`, y = Dominante_prop)) +
+ggplot(df_agg, aes(x = Numero_de_jugadores, y = Dominante_prop)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
   labs(title = "Nº de jugadores vs Proporción de mano dominante")

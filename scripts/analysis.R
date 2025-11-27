@@ -1,8 +1,23 @@
 library(dplyr)
 library(ggplot2)
 library(reshape2)
+library(dplyr)
+library(moments)
 
+# Carga de datos de la hoja de Excel
 df <- read_excel("data/DATOS ESTADISTICA.xlsx", sheet="FORMATO 1")
+
+# ============= AGREGACIÓN DE DATOS =================
+
+#eliminar columna juego que funciona como índice
+df_agg <- df_agg %>% select(-Juego)
+
+df_agg <- df_agg %>% 
+  rename(
+    Condicion_de_la_torre = `Condicion de la torre`,
+    Numero_de_jugadores   = `Numero de jugadores`
+  )
+
 
 df_agg <- df %>%
   group_by(Juego, `Condicion de la torre`, `Numero de jugadores`) %>%
@@ -26,7 +41,7 @@ df_agg <- df %>%
 # Seleccionar solo variables numéricas relevantes
 df_num <- df_agg %>% 
   select(
-    Numero_de_jugadores = `Numero de jugadores`,
+    Numero_de_jugadores,
     Tiempo_promedio,
     Tiempo_mediana,
     Tiempo_sd,
@@ -38,6 +53,61 @@ df_num <- df_agg %>%
     Dominante_n,
     NoDominante_n
   )
+
+# ================ EXPLORACIÓN DE DATOS ====================
+# Datos númericos
+resumen_numerico <- df_num %>%
+  summarise(
+    across(everything(),
+           list(
+             media = mean,
+             mediana = median,
+             sd = sd,
+             min = min,
+             max = max,
+             iqr = IQR
+           ),
+           na.rm = TRUE)
+  )
+
+forma_numerica <- df_num %>%
+  summarise(
+    across(everything(),
+           list(
+             skewness = skewness,
+             kurtosis = kurtosis
+           ),
+           na.rm = TRUE)
+  )
+
+for (v in names(df_num)) {
+  print(
+    ggplot(df_agg, aes(x = .data[[v]])) +
+      geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+      theme_minimal() +
+      labs(title = paste("Histograma de", v), x = v, y = "Frecuencia")
+  )
+}
+
+# VARIABLES CATEGÓRICAS
+cat_vars <- df_agg %>% select(where(is.character))
+
+for (v in names(cat_vars)) {
+  cat("\n===== Variable:", v, "=====\n")
+  print(table(df_agg[[v]]))
+  print(prop.table(table(df_agg[[v]])))
+}
+
+for (v in names(cat_vars)) {
+  print(
+    ggplot(df_agg, aes(x = .data[[v]])) +
+      geom_bar(fill = "orange", color = "black") +
+      theme_minimal() +
+      labs(title = paste("Frecuencias de", v), x = v, y = "Cuenta")
+  )
+}
+
+# ================ CORRELACIÓN DE DATOS ===================
 
 # Matriz de correlación
 corr_matrix <- cor(df_num, use = "complete.obs")
