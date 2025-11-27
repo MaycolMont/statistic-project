@@ -9,16 +9,6 @@ df <- read_excel("data/DATOS ESTADISTICA.xlsx", sheet="FORMATO 1")
 
 # ============= AGREGACIÓN DE DATOS =================
 
-#eliminar columna juego que funciona como índice
-df_agg <- df_agg %>% select(-Juego)
-
-df_agg <- df_agg %>% 
-  rename(
-    Condicion_de_la_torre = `Condicion de la torre`,
-    Numero_de_jugadores   = `Numero de jugadores`
-  )
-
-
 df_agg <- df %>%
   group_by(Juego, `Condicion de la torre`, `Numero de jugadores`) %>%
   summarise(
@@ -38,7 +28,17 @@ df_agg <- df %>%
   ) %>%
   ungroup()
 
-# Seleccionar solo variables numéricas relevantes
+# Eliminar columna Juego que no aporta información
+df_agg <- df_agg %>% select(-Juego)
+
+# Renombrar columnas con espacios a guión bajo
+df_agg <- df_agg %>% 
+  rename(
+    Condicion_de_la_torre = `Condicion de la torre`,
+    Numero_de_jugadores   = `Numero de jugadores`
+  )
+
+# Separación de variables
 df_num <- df_agg %>% 
   select(
     Numero_de_jugadores,
@@ -53,6 +53,8 @@ df_num <- df_agg %>%
     Dominante_n,
     NoDominante_n
   )
+
+df_categoricas <- df_agg %>% select(where(is.character))
 
 # ================ EXPLORACIÓN DE DATOS ====================
 # Datos númericos
@@ -80,25 +82,44 @@ forma_numerica <- df_num %>%
            na.rm = TRUE)
   )
 
+# Historigramas
 for (v in names(df_num)) {
-  print(
-    ggplot(df_agg, aes(x = .data[[v]])) +
+    p <- ggplot(df_agg, aes(x = .data[[v]])) +
       geom_histogram(bins = 30, fill = "skyblue", color = "black") +
       theme_minimal() +
       labs(title = paste("Histograma de", v), x = v, y = "Frecuencia")
-  )
+  
+    ggsave(
+      filename = paste0("histograma_", v, ".png"),
+      plot = p,
+      width = 6,
+      height = 4,
+      dpi = 300
+    )
 }
+
+
+# Diagramas de caja
+for (v in names(df_num)) {
+    p <- ggplot(df_agg, aes(y = .data[[v]])) +
+      geom_boxplot(fill = "lightgreen") +
+      theme_minimal() +
+      labs(title = paste("Diagrama de caja de", v), y = v)
+
+    ggsave(
+      filename = paste0("boxplot_", v, ".png"),
+      plot = p,
+      width = 6,
+      height = 4,
+      dpi = 300
+    )
+}
+
 
 # VARIABLES CATEGÓRICAS
-cat_vars <- df_agg %>% select(where(is.character))
 
-for (v in names(cat_vars)) {
-  cat("\n===== Variable:", v, "=====\n")
-  print(table(df_agg[[v]]))
-  print(prop.table(table(df_agg[[v]])))
-}
-
-for (v in names(cat_vars)) {
+# Gráficos de barras
+for (v in names(df_categoricas)) {
   print(
     ggplot(df_agg, aes(x = .data[[v]])) +
       geom_bar(fill = "orange", color = "black") +
@@ -153,7 +174,7 @@ ggplot(df_agg, aes(x = Intentos_totales, y = Tiempo_promedio)) +
   labs(title = "Intentos totales vs Tiempo promedio")
 
 # 4. Numero_de_jugadores vs Dominante_prop
-ggplot(df_agg, aes(x = `Numero de jugadores`, y = Dominante_prop)) +
+ggplot(df_agg, aes(x = Numero_de_jugadores, y = Dominante_prop)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
   labs(title = "Nº de jugadores vs Proporción de mano dominante")
@@ -161,7 +182,7 @@ ggplot(df_agg, aes(x = `Numero de jugadores`, y = Dominante_prop)) +
 # 5. Tiempo_min vs Tiempo_mediana
 ggplot(df_agg, aes(x = Tiempo_min, y = Tiempo_mediana)) +
   geom_point() +
-  geom_smooth(method = "lm", se = FALSE) +
+  geom_smooth(method = "lm", se = FALSE) + 
   labs(title = "Tiempo mínimo vs Tiempo mediana")
 
 # 6. Dominante_n vs Intentos_totales
@@ -169,3 +190,6 @@ ggplot(df_agg, aes(x = Dominante_n, y = Intentos_totales)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE) +
   labs(title = "Intentos totales vs Nº de veces usando mano dominante")
+
+resumen_numerico
+forma_numerica
